@@ -27,6 +27,19 @@ SoftwareSerial mySoftwareSerial(10, 11); // RX, TX
 DFRobotDFPlayerMini myDFPlayer;
 void printDetail(uint8_t type, int value);
 
+const int volumePin = A4;
+const int buttonsPin = A5;
+
+int currentFolder = -1;
+int currentFile = 1;
+
+int numberOfFiles[] = {0, 0, 0, 0, 0, 0, 0};
+
+unsigned long lastButtonEvent;
+unsigned long lastVolumeEvent;
+
+int currentVolume = -1;
+
 void setup()
 {
   mySoftwareSerial.begin(9600);
@@ -42,22 +55,91 @@ void setup()
     Serial.println(F("2.Please insert the SD card!"));
     while(true);
   }
+
+  pinMode(buttonsPin, INPUT);
+
   Serial.println(F("DFPlayer Mini online."));
 
-  myDFPlayer.volume(10);  //Set volume value. From 0 to 30
-  //myDFPlayer.play(4);  //Play the first mp3
-  myDFPlayer.playFolder(2, 1);
+  for (int i=1;i<8;i++) {
+    numberOfFiles[i-1] = myDFPlayer.readFileCountsInFolder(i);
+    Serial.println(numberOfFiles[i-1]);
+  }
+  
+ 
+  myDFPlayer.volume(5);  //Set volume value. From 0 to 30
+
+  // play last song from eeprom here ! ! !
+  
+}
+
+// Prueft welcher Knopf gedrueckt wurde
+// Gibt -1 zurueck falls kein Knopf gedrueckt wurde
+int checkButtonPressed() {
+  int value = 0;
+  value = analogRead(buttonsPin);  
+  if (value > 435) return 3;
+  if (value > 250) return 2;
+  if (value > 140) return 1;
+  return -1;
+}
+
+// Gibt true zurueck falls ein neuer Knopf gedrueckt wurde
+boolean checkAndSetButtonPressed() {
+  if (millis() - lastButtonEvent < 100) {
+    return;
+  }
+  
+  int newButtonPressed = checkButtonPressed();
+  if (newButtonPressed == -1){
+    return false;
+  }
+  
+  if (currentFolder == newButtonPressed) {      
+    if (currentFile < numberOfFiles[currentFolder-1]) {
+      currentFile++;
+    } else {
+      currentFile = 1;       
+    }
+    Serial.println("playing song "+String(currentFile)+" in folder"+String(currentFolder));
+    myDFPlayer.playFolder(currentFolder, currentFile);
+  } else { 
+    currentFolder = newButtonPressed;
+    Serial.println("playing folder "+String(currentFolder));
+    myDFPlayer.playFolder(currentFolder, 1);
+  }
+  lastButtonEvent = millis();
+  //saveSongAndPositionInEeprom(0);
+  return true;
+}
+
+void checkAndSetVolume() {
+  if (millis() - lastVolumeEvent < 100){
+    return;
+  }
+  int volume = analogRead(volumePin);
+  volume = map(volume, 1023, 10, 0, 10);
+
+  if (volume != currentVolume) {
+    if (volume == 0) {
+      myDFPlayer.pause();
+      currentVolume = 0;
+      return;
+    }
+    if (currentVolume == 0) {
+      myDFPlayer.start();
+    }
+    
+    Serial.println(volume);
+    myDFPlayer.volume(volume);  //Set volume value. From 0 to 30
+    currentVolume = volume;
+  }
+  lastVolumeEvent = millis();
 }
 
 void loop()
 {
-  static unsigned long timer = millis();
-
-  if (millis() - timer > 3000) {
-    timer = millis();
-   // myDFPlayer.next();  //Play next mp3 every 3 second.
-  }
-
+  checkAndSetButtonPressed();
+  checkAndSetVolume();
   if (myDFPlayer.available()) {
     printDetail(myDFPlayer.readType(), myDFPlayer.read()); //Print the detail message from DFPlayer to handle different errors and states.
   }
