@@ -1,23 +1,10 @@
-/***************************************************
-DFPlayer - A Mini MP3 Player For Arduino
- <https://www.dfrobot.com/index.php?route=product/product&product_id=1121>
+/*
 
- ***************************************************
- This example shows the basic function of library for DFPlayer.
+	Leisebert - a DIY Hoerbert for Headphones
 
- Created 2016-12-07
- By [Angelo qiao](Angelo.qiao@dfrobot.com)
+	Author: June 2020 M. Schmutz
 
- GNU Lesser General Public License.
- See <http://www.gnu.org/licenses/> for details.
- All above must be included in any redistribution
- ****************************************************/
-
-/***********Notice and Trouble shooting***************
- 1.Connection and Diagram can be found here
- <https://www.dfrobot.com/wiki/index.php/DFPlayer_Mini_SKU:DFR0299#Connection_Diagram>
- 2.This code is tested on Arduino Uno, Leonardo, Mega boards.
- ****************************************************/
+*/
 
 #include "Arduino.h"
 #include "SoftwareSerial.h"
@@ -25,20 +12,26 @@ DFPlayer - A Mini MP3 Player For Arduino
 
 SoftwareSerial mySoftwareSerial(10, 11); // RX, TX
 DFRobotDFPlayerMini myDFPlayer;
+
 void printDetail(uint8_t type, int value);
 
+
+// analog pins for buttons and volume
 const int volumePin = A4;
 const int buttonsPin = A5;
 
+// current status variables
+int numberOfFiles[] = {0, 0, 0, 0, 0, 0, 0};
 int currentFolder = -1;
 int currentFile = 1;
+int currentVolume = -1;
+int lastButtonPressed;
 
-int numberOfFiles[] = {0, 0, 0, 0, 0, 0, 0};
-
+// event timing variables
 unsigned long lastButtonEvent;
 unsigned long lastVolumeEvent;
 
-int currentVolume = -1;
+
 
 void setup()
 {
@@ -46,34 +39,35 @@ void setup()
   Serial.begin(115200);
   delay(5000);
   Serial.println();
-  Serial.println(F("DFRobot DFPlayer Mini Demo"));
-  Serial.println(F("Initializing DFPlayer ... (May take 3~5 seconds)"));
+  Serial.println("Leisebert - a DIY Hoerbert for Headphones");
+  Serial.println("Initializing DFPlayer ... ");
 
-  if (!myDFPlayer.begin(mySoftwareSerial)) {  //Use softwareSerial to communicate with mp3.
-    Serial.println(F("Unable to begin:"));
-    Serial.println(F("1.Please recheck the connection!"));
-    Serial.println(F("2.Please insert the SD card!"));
-    while(true);
+  if (!myDFPlayer.begin(mySoftwareSerial)) 
+    Serial.println("Unable to begin:");
+    Serial.println("1.Please recheck the connection!");
+    Serial.println("2.Please insert the SD card!");
+    // TODO reset here ! ! !
+	while(true);
   }
 
   pinMode(buttonsPin, INPUT);
 
-  Serial.println(F("DFPlayer Mini online."));
-
+  // get number of files per folder
   for (int i=1;i<8;i++) {
     numberOfFiles[i-1] = myDFPlayer.readFileCountsInFolder(i);
     Serial.println(numberOfFiles[i-1]);
   }
-  
  
-  myDFPlayer.volume(5);  //Set volume value. From 0 to 30
+  // set volume value
+  checkAndSetVolume();
 
   // play last song from eeprom here ! ! !
-  
+ 
+  Serial.println("Leisebert online.");
+ 
 }
 
-// Prueft welcher Knopf gedrueckt wurde
-// Gibt -1 zurueck falls kein Knopf gedrueckt wurde
+// check value of buttons and return folder number
 int checkButtonPressed() {
   int value = 0;
   value = analogRead(buttonsPin);  
@@ -83,49 +77,60 @@ int checkButtonPressed() {
   return -1;
 }
 
-// Gibt true zurueck falls ein neuer Knopf gedrueckt wurde
+// check if button has been pressed
 boolean checkAndSetButtonPressed() {
-  if (millis() - lastButtonEvent < 100) {
+	 
+  if (millis() - lastButtonEvent < 100) { // skip if lastButtonEvent is too close
     return;
   }
   
-  int newButtonPressed = checkButtonPressed();
-  if (newButtonPressed == -1){
+  int newButtonPressed = checkButtonPressed(); // get value of button
+  
+  if (newButtonPressed == -1 or newButtonPressed == lastButtonPressed){ // skip if no button pressed or button has not been released since last check
     return false;
   }
   
-  if (currentFolder == newButtonPressed) {      
-    if (currentFile < numberOfFiles[currentFolder-1]) {
+  if (currentFolder == newButtonPressed) { // check what to do if button pressed
+    
+	if (currentFile < numberOfFiles[currentFolder-1]) { // play next file if not at the end
       currentFile++;
-    } else {
+    } else { // play first file if at the end of folder
       currentFile = 1;       
     }
+	
     Serial.println("playing song "+String(currentFile)+" in folder"+String(currentFolder));
-    myDFPlayer.playFolder(currentFolder, currentFile);
-  } else { 
+    myDFPlayer.playFolder(currentFolder, currentFile); // play the file
+  } else { // play first file from new folder
     currentFolder = newButtonPressed;
     Serial.println("playing folder "+String(currentFolder));
-    myDFPlayer.playFolder(currentFolder, 1);
+    myDFPlayer.playFolder(currentFolder, 1); // play the file
   }
+  
   lastButtonEvent = millis();
+  lastButtonPressed = newButtonPressed;
+  
+  // TODO save to eeprome here ! ! !
   //saveSongAndPositionInEeprom(0);
   return true;
 }
 
+// set volume
 void checkAndSetVolume() {
-  if (millis() - lastVolumeEvent < 100){
+
+  if (millis() - lastVolumeEvent < 100){ // skip if lastVolumeEvent is too close
     return;
   }
+  
   int volume = analogRead(volumePin);
   volume = map(volume, 1023, 10, 0, 10);
 
-  if (volume != currentVolume) {
-    if (volume == 0) {
+  if (volume != currentVolume) { // check what to do if volume changed
+    if (volume == 0) { // pause player if volume == 0
       myDFPlayer.pause();
       currentVolume = 0;
       return;
     }
-    if (currentVolume == 0) {
+    if (currentVolume == 0) { // resume player if volume turned up again
       myDFPlayer.start();
     }
     
@@ -136,6 +141,7 @@ void checkAndSetVolume() {
   lastVolumeEvent = millis();
 }
 
+// MAIN
 void loop()
 {
   checkAndSetButtonPressed();
