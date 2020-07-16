@@ -36,7 +36,7 @@ unsigned long lastVolumeEvent;
 unsigned long lastBusyEvent;
 
 // settings
-int maxVolume = 10 // 0..30
+int maxVolume = 10; // 0..30
 
 void setup()
 {
