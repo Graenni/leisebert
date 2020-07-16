@@ -1,8 +1,6 @@
 import os
 import eyed3
 
-# TODO output tracklist or covers to sd card
-
 colors = ['white', 'red', 'transparent', 'yellow', 'black', 'green', 'grey', 'blue']
 
 with open('contents.txt', 'w') as outfile:
