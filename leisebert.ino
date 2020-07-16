@@ -35,6 +35,9 @@ unsigned long lastButtonEvent;
 unsigned long lastVolumeEvent;
 unsigned long lastBusyEvent;
 
+// settings
+int maxVolume = 10 // 0..30
+
 void setup()
 {
   mySoftwareSerial.begin(9600);
@@ -66,10 +69,12 @@ void setup()
     Serial.println(numberOfFiles[i - 1]);
   }
 
-  // set volume value
-  checkAndSetVolume();
+  // set initial volume value
+  myDFPlayer.volume(5);
 
   // TODO play last song from eeprom here ! ! !
+  // currently just start playing button 1
+  setSong(1);
 
   Serial.println("Leisebert online.");
 
@@ -150,8 +155,7 @@ void checkAndSetVolume() {
   }
 
   int volume = analogRead(volumePin);
-  volume = map(volume, 1023, 10, 0, 10);
-  //   volume = 10;
+  volume = map(volume, 10, 1023, 0, maxVolume);
 
   if (volume != currentVolume) { // check what to do if volume changed
     Serial.println(volume);
