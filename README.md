@@ -1,5 +1,5 @@
 # leisebert
-Hoerbert hack with headphones
+DIY Hoerbert for use with headphones
 
 # notes
 ! ! ! Currently under development ! ! !

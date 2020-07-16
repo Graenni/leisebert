@@ -16,9 +16,11 @@ DFRobotDFPlayerMini myDFPlayer;
 void printDetail(uint8_t type, int value);
 
 // analog pins for buttons and volume
-const int busyPin = A1;
+const int busyPin = 12;
 const int volumePin = A2;
-const int buttonsPin = A3;
+
+// define buttons pins: TODO here colors series
+const int buttonPins[] = {2, 3, 4, 5, 6, 7, 8, 9};
 
 // current status variables
 int numberOfFiles[] = {0, 0, 0, 0, 0, 0, 0};
@@ -42,114 +44,117 @@ void setup()
   Serial.println("Leisebert - a DIY Hoerbert for Headphones");
   Serial.println("Initializing DFPlayer ... ");
 
-  if (!myDFPlayer.begin(mySoftwareSerial)) { 
+  if (!myDFPlayer.begin(mySoftwareSerial)) {
     Serial.println("Unable to begin:");
     Serial.println("1.Please recheck the connection!");
     Serial.println("2.Please insert the SD card!");
     // TODO reset here ! ! !
-    while(true);
+    while (true);
   }
 
-  pinMode(buttonsPin, INPUT);
-  digitalWrite(buttonsPin, HIGH);
-  
-  // get number of files per folder
-  for (int i=1;i<8;i++) {
-    numberOfFiles[i-1] = myDFPlayer.readFileCountsInFolder(i);
-    Serial.println(numberOfFiles[i-1]);
+  // set up button pins as digital input with pullup on
+  for (int i = 0; i < 8; i++) {
+    pinMode(buttonPins[i], INPUT_PULLUP);
   }
- 
+
+  // set busy pin as digital input with pullup on
+  pinMode(busyPin, INPUT_PULLUP);
+
+  // get number of files per folder
+  for (int i = 1; i < 8; i++) {
+    numberOfFiles[i - 1] = myDFPlayer.readFileCountsInFolder(i);
+    Serial.println(numberOfFiles[i - 1]);
+  }
+
   // set volume value
   checkAndSetVolume();
 
-  // play last song from eeprom here ! ! !
- 
+  // TODO play last song from eeprom here ! ! !
+
   Serial.println("Leisebert online.");
 
-   myDFPlayer.playFolder(1, 1);
- 
 }
 
 // check value of buttons and return folder number
 int checkButtonPressed() {
-  int value = 1023;
-  // take multiple samples to prevent some false readings of too high voltages
-  for (int i=0;i<5;i++) {
-    int tmp = analogRead(buttonsPin);
-    // if (tmp > 1000) return; // return if button not pressed during any of the 5 samplings (=incomplete or too short button press)
-    if (tmp < value) value = tmp;
+  for (int i = 0; i < 8; i++) {
+    int buttonVal = digitalRead(buttonPins[i]);
+
+    // button pressed
+    if (buttonVal == LOW) {
+      newButtonPressed = buttonVal;
+
+      // check some early return conditions
+      if (millis() - lastButtonEvent < 500) return false; // last button event too close -> skip
+      if (newButtonPressed == lastButtonPressed) return false; // button has not been released since last check -> skip
+
+      // button event ok -> play song
+      setSong(i + 1);
+
+      // save button event timing
+      lastButtonEvent = millis();
+
+      // save button event
+      lastButtonPressed = newButtonPressed;
+
+      return true;
+    }
   }
-  return value;
-  if (value < 120) return value; //1; // 793 (white)
-  if (value < 200) return value; //2; // 528 (blue)
-  if (value < 310) return value; //3; // 395 (grey)
-  if (value < 350) return value; //4; // 315 (green)
-  if (value < 400) return value; //5; // 262 (black)
-  if (value < 425) return value; //6; // 225 (yellow)
-  if (value < 175 and value > 165) return value; //7; // 196 (transparent)
-  if (value < 100) return value; //8; // 174 (red)
-  return -1;
+  lastButtonPressed = -1; // no button pressed since last check
+  return false;
 }
 
-// check if button has been pressed
-boolean checkAndSetButtonPressed() {
-	 
-  if (millis() - lastButtonEvent < 1000) { // skip if lastButtonEvent is too close
-    return;
-  }
-  
-  newButtonPressed = checkButtonPressed(); // get value of button
-  int value = newButtonPressed; 
+boolean setSong(int buttonVal) {
 
-  newButtonPressed = -1;
-  if (value < 445 and value > 435) newButtonPressed = 8; // 174 (red)
-  if (value < 415 and value > 405) newButtonPressed = 7; // 196 (transparent)
-  if (value < 380 and value > 370) newButtonPressed = 6; // 225 (yellow)
-  if (value < 340 and value > 325) newButtonPressed = 5; // 262 (black)
-  if (value < 295 and value > 280) newButtonPressed = 4; // 315 (green)
-  if (value < 235 and value > 225) newButtonPressed = 3; // 395 (grey)
-  if (value < 175 and value > 165) newButtonPressed = 2; // 528 (blue)
-  if (value < 150) newButtonPressed = 1; // 793 (white)
-    
-  if (newButtonPressed == -1 or newButtonPressed == lastButtonPressed){ // skip if no button pressed or button has not been released since last check  
-    lastButtonPressed = newButtonPressed;
-    return false;
-  }
+  // check what to play
+  // - next file if same button
+  // - new folder if new button
+  if (currentFolder == buttonVal) {
 
-  Serial.println(millis() - lastButtonEvent);
-  Serial.println(value);
-  Serial.println(lastButtonPressed);
-  Serial.println(newButtonPressed);
-  
-  if (currentFolder == newButtonPressed) { // check what to do if button pressed   
-	  playNextSong();
-  } else { // play first file from new folder
-    currentFolder = newButtonPressed;
+    // specifiy next file to be played within folder:
+    // - next file if not yet at the end of folder
+    // - first file if at the end of the folder
+    if (currentFile < numberOfFiles[currentFolder - 1]) {
+      currentFile++;
+    } else {
+      currentFile = 1;
+    }
+
+    Serial.println("playing song " + String(currentFile) + " in folder" + String(currentFolder));
+
+  } else {
+
+    // set new button as current folder
+    currentFolder = buttonVal;
+
+    // reset file counter to first file
     currentFile = 1;
-    Serial.println("playing folder "+String(currentFolder));
-    myDFPlayer.playFolder(currentFolder, currentFile); // play the file
+
+    Serial.println("playing folder " + String(currentFolder));
+
   }
-  
-  lastButtonEvent = millis();
-  lastButtonPressed = newButtonPressed;
-  
+
+  // play the selected file
+  myDFPlayer.playFolder(currentFolder, currentFile);
+
   // TODO save to eeprome here ! ! !
-  //saveSongAndPositionInEeprom(0);
+  // saveSongAndPositionInEeprom(0);
   return true;
 }
 
 // set volume
 void checkAndSetVolume() {
 
-  if (millis() - lastVolumeEvent < 100){ // skip if lastVolumeEvent is too close
+  if (millis() - lastVolumeEvent < 500) { // skip if lastVolumeEvent is too close
     return;
   }
-  
+
   int volume = analogRead(volumePin);
   volume = map(volume, 1023, 10, 0, 10);
-  volume = 10;
+  //   volume = 10;
 
   if (volume != currentVolume) { // check what to do if volume changed
+    Serial.println(volume);
     if (volume == 0) { // pause player if volume == 0
       myDFPlayer.pause();
       currentVolume = 0;
@@ -158,7 +163,7 @@ void checkAndSetVolume() {
     if (currentVolume == 0) { // resume player if volume turned up again
       myDFPlayer.start();
     }
-    
+
     // Serial.println(volume);
     myDFPlayer.volume(volume);  //Set volume value. From 0 to 30
     currentVolume = volume;
@@ -166,26 +171,15 @@ void checkAndSetVolume() {
   lastVolumeEvent = millis();
 }
 
-// play next song
-void playNextSong() {
-  if (currentFile < numberOfFiles[currentFolder-1]) { // play next file if not at the end
-    currentFile++;
-  } else { // play first file if at the end of folder
-    currentFile = 1;       
-  }
-  
-  Serial.println("playing song "+String(currentFile)+" in folder"+String(currentFolder));
-  myDFPlayer.playFolder(currentFolder, currentFile); // play the file
-  return;
-}
-
 // check if current song finished playing -> play next
 void checkSongFinished() {
-  if (millis() - lastBusyEvent > 1000 and millis() - lastButtonEvent > 1000) {
-    int value = analogRead(busyPin);
-    if (value > 1000) {
+  if (millis() - lastBusyEvent > 1000 and millis() - lastButtonEvent > 1000 and currentFolder > 0 and currentVolume != 0) {
+    int busyVal = digitalRead(busyPin);
+    if (busyVal == HIGH) {
       Serial.println("End of Song. Playing next!");
-      playNextSong();
+      
+      // emulate button press with button of current folder
+      setSong(currentFolder);
     }
     lastBusyEvent = millis();
   }
@@ -196,9 +190,10 @@ void checkSongFinished() {
 // MAIN
 void loop()
 {
-  checkAndSetButtonPressed();
-  checkAndSetVolume();
-  checkSongFinished();
+  checkButtonPressed(); // check if button pressed and play corresponding song
+  checkAndSetVolume(); // check if volume has been adjusted
+  checkSongFinished(); // check if song has finished playing
+  
   if (myDFPlayer.available()) {
     printDetail(myDFPlayer.readType(), myDFPlayer.read()); //Print the detail message from DFPlayer to handle different errors and states.
   }
@@ -206,7 +201,7 @@ void loop()
 
 
 // DEBUG
-void printDetail(uint8_t type, int value){
+void printDetail(uint8_t type, int value) {
   switch (type) {
     case TimeOut:
       Serial.println(F("Time Out!"));
