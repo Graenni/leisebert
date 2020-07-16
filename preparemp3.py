@@ -2,7 +2,7 @@ import os
 import eyed3
 
 for folder in range(1, 9):
-    path = "mp3test/" + str(folder) + '/'
+    path = "./" + str(folder) + '/'
     if not os.path.isdir(path):
         os.mkdir(path)
 
