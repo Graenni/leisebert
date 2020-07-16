@@ -1,7 +1,7 @@
 py -m venv ./pivenv/
 .\pivenv\Scripts\activate.bat & ^
 pip install -r requirements.txt & ^
-pyinstaller --onefile preparemp3.py & ^
+pyinstaller -F -i "lb.ico" preparemp3.py & ^
 deactivate & ^
 rmdir /q /s .\pivenv\ & ^
 rmdir /q /s .\build\ & ^
