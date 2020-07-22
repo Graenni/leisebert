@@ -3,7 +3,7 @@ import eyed3
 
 colors = ['white', 'red', 'transparent', 'yellow', 'black', 'green', 'grey', 'blue']
 
-with open('contents.txt', 'w') as outfile:
+with open('contents.txt', 'w', encoding="utf-8") as outfile:
     outfile.write('L E I S E B E R T   C O N T E N T S\n')
     outfile.write('-----------------------------------\n')
     for folder in range(1, 9):
