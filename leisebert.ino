@@ -23,7 +23,7 @@ const int volumePin = A2;
 const int buttonPins[] = {2, 3, 4, 5, 6, 7, 8, 9};
 
 // current status variables
-int numberOfFiles[] = {0, 0, 0, 0, 0, 0, 0};
+int numberOfFiles[] = {0, 0, 0, 0, 0, 0, 0, 0};
 int currentFolder = -1;
 int currentFile = 1;
 int currentVolume = -1;
@@ -64,7 +64,7 @@ void setup()
   pinMode(busyPin, INPUT_PULLUP);
 
   // get number of files per folder
-  for (int i = 1; i < 8; i++) {
+  for (int i = 1; i < 9; i++) {
     numberOfFiles[i - 1] = myDFPlayer.readFileCountsInFolder(i);
     Serial.println(numberOfFiles[i - 1]);
   }
